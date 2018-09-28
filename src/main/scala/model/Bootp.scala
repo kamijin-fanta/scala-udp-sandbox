@@ -1,13 +1,16 @@
 package model
 
-import java.net.Inet4Address
+import java.net.{Inet4Address, InetAddress}
+import java.nio.ByteBuffer
 
 import fastparse.byte.all
 import fastparse.byte.all.Bytes
 import fastparse.core
+import fastparse.core.Parsed.Success
 import org.pcap4j.util.{ByteArrays, MacAddress}
 
-object BootpPacket{
+object BootpPacket {
+
   import fastparse.byte.all._
   import BE._
 
@@ -37,11 +40,40 @@ object BootpPacket{
     )
   })
 
+  def parse(byteBuffer: ByteBuffer): core.Parsed[BootpPacket, Byte, all.Bytes] = {
+    val arr = new Array[Byte](byteBuffer.remaining())
+    byteBuffer.get(arr)
+    parse(arr)
+  }
+
   def parse(array: Array[Byte]): core.Parsed[BootpPacket, Byte, all.Bytes] =
     parse(Bytes(array))
 
   def parse(bytes: Bytes): core.Parsed[BootpPacket, Byte, all.Bytes] =
     parser.parse(bytes)
+
+  def parseOpt(array: Array[Byte]): Option[BootpPacket] =
+    parse(array) match {
+      case Success(x, index) =>
+        Some(x)
+      case _ =>
+        None
+    }
+
+  implicit class BootpDhcpExtention(value: BootpPacket) {
+    private val messageType = {
+      value.options
+        .find(_.optionType == BootpOptionType.DhcpMessageType)
+        .map(_.value.toInt())
+        .getOrElse(0)
+    }
+
+    def isDiscover: Boolean = value.bootpType == 1 && messageType == DhcpMessageType.Discover
+    def isOffer: Boolean = value.bootpType == 2 && messageType == DhcpMessageType.Offer
+    def isRequest: Boolean = value.bootpType == 1 && messageType == DhcpMessageType.Request
+    def isAck: Boolean = value.bootpType == 2 && messageType == DhcpMessageType.Ack
+  }
+
 }
 
 case class BootpPacket(
@@ -56,28 +88,56 @@ case class BootpPacket(
       Bytes.fromLong(transactionId, size = 4) ++ Bytes.fill(8)(0) ++
       Bytes(yourClientIp.getAddress) ++ Bytes.fill(8)(0) ++
       Bytes(clientMac.getAddress) ++ Bytes.fill(10)(0) ++
-      Bytes.fill(64)(0) ++ Bytes.fill(128)(0) ++ Bytes.fill(4)(0) ++
+      Bytes.fill(64)(0) ++ Bytes.fill(128)(0) ++ Bytes(0x63, 0x82, 0x53, 0x63) ++
       Bytes.concat(options.map(o => Bytes(o.optionType) ++ Bytes.fromLong(o.value.length, 1) ++ o.value)) ++
       Bytes(0xff)
+
+}
+
+case class DhcpOptions(
+                        messageType: Int,
+                        mask: Option[String],
+                        router: Option[String],
+                        dns: Option[String],
+                        leaseTime: Option[Int]
+                      ) {
+  def asBootpOptions: Seq[BootpOption] = {
+    Seq(
+      BootpOption(BootpOptionType.DhcpMessageType, Bytes(messageType))
+    ) ++ mask.map(m =>
+      BootpOption(BootpOptionType.SubnetMask, Bytes(InetAddress.getByName(m).getAddress))
+    ) ++ router.toSeq.flatMap(r =>
+      Seq(
+        BootpOption(BootpOptionType.Router, Bytes(InetAddress.getByName(r).getAddress)),
+        BootpOption(BootpOptionType.DhcpServerIdentify, Bytes(InetAddress.getByName(r).getAddress))
+      )
+    ) ++ dns.map(d =>
+      BootpOption(BootpOptionType.DNS, Bytes(InetAddress.getByName(d).getAddress))
+    ) ++ leaseTime.map(l =>
+      BootpOption(BootpOptionType.IpAddressLeaseTime, Bytes.fromInt(l))
+    )
+  }
 }
 
 
 case class BootpOption(optionType: Short, value: Bytes)
 
 object BootpOptionType extends Enumeration {
-  val SubnetMask = 1
-  val Router = 3
-  val DNS = 6
-  val HostName = 12
-  val RequestedIpAddress = 50
-  val IpAddressLeaseTime = 51
-  val DhcpMessageType = 53
-  val ParameterRequestList = 55
+  val SubnetMask = 1.toShort
+  val Router = 3.toShort
+  val DNS = 6.toShort
+  val HostName = 12.toShort
+  val RequestedIpAddress = 50.toShort
+  val IpAddressLeaseTime = 51.toShort
+  val DhcpMessageType = 53.toShort
+  val DhcpServerIdentify = 54.toShort
+  val ParameterRequestList = 55.toShort
 }
 
 object DhcpMessageType extends Enumeration {
   val Discover = 1
   val Offer = 2
   val Request = 3
-  val Ack = 4
+  val Ack = 5
+  val Release = 7
 }

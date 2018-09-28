@@ -15,8 +15,8 @@ object JavaNetSandbox {
 
 
 class EchoServer() {
-  val addr: InetAddress = InetAddress.getByName("172.25.15.255")
-  val socket = new DatagramSocket(17500, addr)
+  val addr: InetAddress = InetAddress.getByName("0.0.0.0")
+  val socket = new DatagramSocket(67, addr)
   socket.setBroadcast(true)
   private var running = false
   private val buf = new Array[Byte](256)
