@@ -78,6 +78,6 @@ class ParserBasicSpec extends FunSpec {
 
     val failure @ Parsed.Failure(_, _, _) =
       JsonParser.json.parse(""" {"key": [null, FOOO]} """)
-    assert(failure.msg === """(obj | CharsWhileIn(" \r\n").rep ~ "\"" ~ !(CharIn("\"\\")) ~ AnyChar.rep ~ "\"" ~ CharsWhileIn(" \r\n").rep | array | nul | number):1:17 ..."FOOO]} """")
+    assert(failure.msg === """(obj | CharsWhileIn(" \r\n").rep ~ "\"" ~ !(CharIn("\"\\")) ~ AnyChar.rep ~ "\"" ~ CharsWhileIn(" \r\n").rep | array | nul | number | boolTrue | boolFalse):1:17 ..."FOOO]} """")
   }
 }
