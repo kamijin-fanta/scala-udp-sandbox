@@ -7,7 +7,7 @@ import model._
 import org.scalatest.FunSpec
 import scodec.bits.ByteVector
 
-class DhcpParser extends FunSpec {
+class DhcpParserSpec extends FunSpec {
   def hexToBytes(hex: String): ByteVector = {
     ByteVector(DatatypeConverter.parseHexBinary(hex))
   }
