@@ -40,13 +40,16 @@ class ParserBasicSpec extends FunSpec {
   }
 
   object JsonParser {
-
     import Json._
 
     val space = CharsWhileIn(" \r\n").rep // 空白のいずれかにマッチ
     val char = (!CharIn("\"\\") ~ AnyChar).!  // "\ 以外の文字列にマッチ
     val chars = space ~ "\"" ~ char.rep.! ~ "\"" ~ space  // ""に囲まれた文字列
     val digit = CharIn('0' to '9').!
+
+    val boolTrue = P("true").map(_ => JsBoolean(true))
+    val boolFalse = P("false").map(_ => JsBoolean(false))
+    val bool = boolTrue | boolFalse
 
     val string = chars.map(s => JsString(s))
     val nul = P("null").map(_ => JsNull)
@@ -57,7 +60,8 @@ class ParserBasicSpec extends FunSpec {
 
     val array = P("[" ~/ json.rep(sep = ",".~/) ~/ "]").map(s => JsArray(s))
 
-    val json: all.Parser[JsonExpr] = P(space ~ (obj | string | array | nul | number) ~ space)
+    val json: all.Parser[JsonExpr] =
+      P(space ~ (obj | string | array | nul | number | bool) ~ space)
   }
 
   it("json") {
